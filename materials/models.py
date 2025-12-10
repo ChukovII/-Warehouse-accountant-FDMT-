@@ -1,24 +1,48 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
-# 1. Таблица материалов (Товары на складе)
-class Material(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Владелец склада", null=True)
-    name = models.CharField(max_length=200, verbose_name="Название материала")
-    # Текущее количество на складе
-    current_quantity = models.FloatField(default=0, verbose_name="Текущее количество")
-    # Минимальный порог (если меньше — нужно закупать)
-    min_threshold = models.FloatField(default=10, verbose_name="Минимальный порог")
-    # Единица измерения (кг, шт, литры)
-    unit = models.CharField(max_length=20, default="шт.", verbose_name="Ед. измерения")
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="Название категории")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Пользователь")
+
+    class Meta:
+        verbose_name = "Категория"
+        verbose_name_plural = "Категории"
 
     def __str__(self):
-        return f"{self.name} ({self.current_quantity} {self.unit})"
+        return self.name
+
+class Material(models.Model):
+    # Константы для единиц измерения
+    UNIT_CHOICES = [
+        ('шт.', 'Штуки'),
+        ('кг', 'Килограммы'),
+        ('л', 'Литры'),
+        ('м', 'Метры'),
+    ]
+    category = models.ForeignKey('Category', on_delete=models.SET_NULL, null=True,
+                                 verbose_name="Категория")
+    article_number = models.CharField(max_length=50, unique=True,
+                                      verbose_name="Артикул", null=True, blank=True)  # Сделаем необязательным пока
+    expiration_date = models.DateField(null=True, blank=True,
+                                       verbose_name="Срок годности")
+
+    # Старые/Обновленные поля:
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Владелец склада", null=True)
+    name = models.CharField(max_length=200, verbose_name="Название материала")
+    current_quantity = models.FloatField(default=0, verbose_name="Текущее количество")
+    min_threshold = models.FloatField(default=10, verbose_name="Минимальный порог")
+    unit = models.CharField(max_length=5, choices=UNIT_CHOICES,
+                            verbose_name="Ед. измерения", default='шт.')  # Обновили max_length и добавили choices
+
+    def __str__(self):
+        # Изменено для отображения Артикула
+        return f"{self.name} ({self.article_number})"
 
     class Meta:
         verbose_name = "Материал"
         verbose_name_plural = "Материалы"
-
 
 # 2. Таблица истории (Для обучения ИИ)
 class UsageHistory(models.Model):
@@ -28,8 +52,9 @@ class UsageHistory(models.Model):
     quantity_used = models.FloatField(verbose_name="Расход")
 
     def __str__(self):
-        return f"{self.date}: {self.material.name} - {self.quantity_used}"
+        return f"{self.material.name} | {self.date}: {self.change}"
 
     class Meta:
-        verbose_name = "Запись расхода"
-        verbose_name_plural = "История расходов"
+        verbose_name = "История использования"
+        verbose_name_plural = "История использования"
+        ordering = ['-date']  # Сортировка по дате (сначала новые)

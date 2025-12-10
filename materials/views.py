@@ -65,3 +65,16 @@ def material_delete(request, pk):
 
     # Показываем шаблон подтверждения, который мы создадим далее
     return render(request, 'materials/material_confirm_delete.html', {'material': material})
+
+@login_required
+def material_history(request, pk):
+    # 1. Получаем материал, принадлежащий пользователю
+    material = get_object_or_404(Material, pk=pk, user=request.user)
+    # 2. Получаем историю использования для этого материала (из модели UsageHistory)
+    history = material.usagehistory_set.all()
+
+    context = {
+        'material': material,
+        'history': history,
+    }
+    return render(request, 'materials/material_history.html', context)

@@ -1,47 +1,71 @@
 {% extends "base.html" %}
+{% load static %} {# Если вы используете статику, например для CSS, убедитесь, что она загружается #}
 
 {% block content %}
 
 <div class="mt-5">
-    <h1 class="mb-4">📦 Учет склада <a href="{% url 'material_create' %}" class="btn btn-success ms-3">Добавить</a></h1>
+    <h1 class="mb-4">
+        📦 Учет склада
+        <a href="{% url 'material_create' %}" class="btn btn-success ms-3">Добавить материал</a>
+    </h1>
 
     <div class="card shadow">
         <div class="card-body">
-            
-            <table class="table table-hover">
+
+            <table class="table table-hover table-striped">
                 <thead class="table-dark">
                     <tr>
                         <th>Название</th>
+                        <th>Артикул</th>
+                        <th>Категория</th>
                         <th>Количество</th>
+                        <th>Ед. изм.</th>
+                        <th>Срок годности</th>
                         <th>Порог</th>
                         <th>Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for material in materials %}
-                    <tr>
+
+                    {# АБСОЛЮТНО НАДЕЖНЫЙ МЕТОД: Присвоение класса через WITH/ENDWITH #}
+                    {# Использование WITH/ENDWITH в каждой ветке IF/ELIF гарантирует закрытие тега #}
+                    {% if material.current_quantity == 0 %}
+                        {% with row_class='table-danger' %}{% endwith %}
+                    {% elif material.current_quantity < material.min_threshold %}
+                        {% with row_class='table-warning' %}{% endwith %}
+                    {% else %}
+                        {% with row_class='table-light' %}{% endwith %}
+                    {% endif %}
+
+                    <tr class="{{ row_class }}">
                         <td>{{ material.name }}</td>
+                        <td>{{ material.article_number|default:"-" }}</td>
+                        <td>{{ material.category.name|default:"-" }}</td>
                         <td>
-                            {{ material.current_quantity }} {{ material.unit }}
+                            {{ material.current_quantity }}
                             {% if material.current_quantity <= material.min_threshold %}
-                                <span class="badge bg-danger">Мало!</span>
+                                <span class="badge bg-danger ms-2">Мало!</span>
                             {% endif %}
                         </td>
-                        <td>{{ material.min_threshold }} {{ material.unit }}</td>
+                        <td>{{ material.unit }}</td>
+                        <td>{{ material.expiration_date|default:"-" }}</td>
+                        <td>{{ material.min_threshold }}</td>
                         <td>
+                            <a href="{% url 'material_history' material.pk %}" class="btn btn-sm btn-info me-2">История</a>
                             <a href="{% url 'material_update' material.pk %}" class="btn btn-sm btn-warning me-2">Изменить</a>
-                            
                             <a href="{% url 'material_delete' material.pk %}" class="btn btn-sm btn-danger">Удалить</a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center">Склад пуст</td>
+                        <td colspan="8" class="text-center">Склад пуст. Добавьте первый материал.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            </div>
+
+        </div>
     </div>
 </div>
 

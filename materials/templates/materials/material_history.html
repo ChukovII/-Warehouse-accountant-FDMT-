@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mt-5">
+    <h1>История материала: {{ material.name }}</h1>
+    <p>Здесь будет отображаться таблица с историей прихода и расхода.</p>
+    <a href="{% url 'material_list' %}" class="btn btn-secondary">Назад к складу</a>
+
+    <ul class="list-group mt-3">
+        {% for item in history %}
+            <li class="list-group-item">
+                {{ item.date }} - Изменение: {{ item.change }}
+            </li>
+        {% empty %}
+            <li class="list-group-item">Нет данных по истории использования.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock content %}
