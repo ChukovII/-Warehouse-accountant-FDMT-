@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow p-4">
+
+                {% if update %}
+                    <h2 class="mb-4">✏️ Изменить материал: {{ material.name }}</h2>
+                {% else %}
+                    <h2 class="mb-4">➕ Добавить новый материал</h2>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}  <button type="submit" class="btn btn-primary mt-3">
+                        {% if update %}Сохранить изменения{% else %}Добавить{% endif %}
+                    </button>
+
+                    <a href="{% url 'material_list' %}" class="btn btn-secondary mt-3 ms-2">Отмена</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

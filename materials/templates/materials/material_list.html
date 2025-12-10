@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="mt-5">
+    <h1 class="mb-4">📦 Учет склада <a href="{% url 'material_create' %}" class="btn btn-success ms-3">Добавить</a></h1>
+
+    <div class="card shadow">
+        <div class="card-body">
+            
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Название</th>
+                        <th>Количество</th>
+                        <th>Порог</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for material in materials %}
+                    <tr>
+                        <td>{{ material.name }}</td>
+                        <td>
+                            {{ material.current_quantity }} {{ material.unit }}
+                            {% if material.current_quantity <= material.min_threshold %}
+                                <span class="badge bg-danger">Мало!</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ material.min_threshold }} {{ material.unit }}</td>
+                        <td>
+                            <a href="{% url 'material_update' material.pk %}" class="btn btn-sm btn-warning me-2">Изменить</a>
+                            
+                            <a href="{% url 'material_delete' material.pk %}" class="btn btn-sm btn-danger">Удалить</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center">Склад пуст</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+    </div>
+</div>
+
+{% endblock content %}
