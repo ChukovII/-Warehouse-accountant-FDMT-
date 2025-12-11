@@ -1,72 +1,320 @@
-{% extends "base.html" %}
-{% load static %} {# Если вы используете статику, например для CSS, убедитесь, что она загружается #}
+{% extends 'base.html' %}
+{% load custom_filters %}
 
 {% block content %}
+<div class="container mt-4">
+    <!-- Заголовок и быстрый поиск -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>📦 Учет материалов</h2>
+            <p class="text-muted">Таблица с фильтрами по категориям, срокам годности и поиском</p>
+        </div>
+        <div class="col-md-4">
+            <!-- НЕМНОГО ИЗМЕНЯЕМ ФОРМУ ПОИСКА: добавляем id и связываем с фильтрами -->
+            <form method="get" class="input-group" id="searchForm">
+                <input type="text" name="search" class="form-control"
+                       placeholder="Поиск по названию или артикулу..."
+                       value="{{ search_query }}"
+                       id="mainSearch">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-search"></i> Поиск
+                </button>
+            </form>
+        </div>
+    </div>
 
-<div class="mt-5">
-    <h1 class="mb-4">
-        📦 Учет склада
-        <a href="{% url 'material_create' %}" class="btn btn-success ms-3">Добавить материал</a>
-    </h1>
+    <!-- Быстрые действия -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <a href="{% url 'material_list' %}" class="btn btn-outline-secondary btn-sm me-2">
+                <i class="bi bi-x-circle"></i> Сбросить фильтры
+            </a>
+            <a href="{% url 'material_create' %}" class="btn btn-success btn-sm">
+                <i class="bi bi-plus-circle"></i> Добавить материал
+            </a>
+        </div>
+    </div>
 
-    <div class="card shadow">
-        <div class="card-body">
-
-            <table class="table table-hover table-striped">
+    <!-- ГЛАВНАЯ ФОРМА ФИЛЬТРАЦИИ - оборачиваем таблицу -->
+    <form method="get" id="filterForm">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
                 <thead class="table-dark">
                     <tr>
-                        <th>Название</th>
-                        <th>Артикул</th>
-                        <th>Категория</th>
-                        <th>Количество</th>
-                        <th>Ед. изм.</th>
-                        <th>Срок годности</th>
-                        <th>Порог</th>
-                        <th>Действия</th>
+                        <!-- Артикул -->
+                        <th width="10%">Артикул</th>
+
+                        <!-- Название -->
+                        <th width="25%">
+                            Название
+                            <div class="mt-1">
+                                <!-- Этот input теперь в главной форме filterForm -->
+                                <input type="text" name="search"
+                                       class="form-control form-control-sm"
+                                       placeholder="Введите название..."
+                                       value="{{ search_query }}"
+                                       id="tableSearch">
+                            </div>
+                        </th>
+
+                        <!-- Категория -->
+                        <th width="15%">
+                            Категория
+                            <div class="mt-1">
+                                <!-- Добавляем form="filterForm" -->
+                                <select name="category" class="form-select form-select-sm" form="filterForm">
+                                    <option value="">Все категории</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}"
+                                            {% if selected_category == category.id|stringformat:"i" %}selected{% endif %}>
+                                        {{ category.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </th>
+
+                        <!-- Количество -->
+                        <th width="10%">Кол-во</th>
+
+                        <!-- Единица измерения -->
+                        <th width="5%">Ед.</th>
+
+                        <!-- Срок годности -->
+                        <th width="15%">
+                            Срок годности
+                            <div class="mt-1">
+                                <!-- Добавляем form="filterForm" -->
+                                <select name="expiry" class="form-select form-select-sm" form="filterForm">
+                                    <option value="">Все</option>
+                                    <option value="expired" {% if selected_expiry == 'expired' %}selected{% endif %}>
+                                        Просроченные
+                                    </option>
+                                    <option value="expires_soon" {% if selected_expiry == 'expires_soon' %}selected{% endif %}>
+                                        Истекает скоро (30 дней)
+                                    </option>
+                                    <option value="no_expiry" {% if selected_expiry == 'no_expiry' %}selected{% endif %}>
+                                        Без срока
+                                    </option>
+                                </select>
+                            </div>
+                        </th>
+
+                        <!-- Порог -->
+                        <th width="10%">Порог</th>
+
+                        <!-- Действия -->
+                        <th width="10%">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for material in materials %}
-
-                    {# АБСОЛЮТНО НАДЕЖНЫЙ МЕТОД: Присвоение класса через WITH/ENDWITH #}
-                    {# Использование WITH/ENDWITH в каждой ветке IF/ELIF гарантирует закрытие тега #}
-                    {% if material.current_quantity == 0 %}
-                        {% with row_class='table-danger' %}{% endwith %}
-                    {% elif material.current_quantity < material.min_threshold %}
-                        {% with row_class='table-warning' %}{% endwith %}
-                    {% else %}
-                        {% with row_class='table-light' %}{% endwith %}
-                    {% endif %}
-
-                    <tr class="{{ row_class }}">
-                        <td>{{ material.name }}</td>
-                        <td>{{ material.article_number|default:"-" }}</td>
-                        <td>{{ material.category.name|default:"-" }}</td>
+                    <tr class="{{ material.row_class }}">
+                        <!-- Артикул -->
                         <td>
-                            {{ material.current_quantity }}
-                            {% if material.current_quantity <= material.min_threshold %}
-                                <span class="badge bg-danger ms-2">Мало!</span>
+                            {% if material.article_number %}
+                                <code>{{ material.article_number }}</code>
+                            {% else %}
+                                <span class="text-muted">—</span>
                             {% endif %}
                         </td>
-                        <td>{{ material.unit }}</td>
-                        <td>{{ material.expiration_date|default:"-" }}</td>
-                        <td>{{ material.min_threshold }}</td>
+
+                        <!-- Название -->
                         <td>
-                            <a href="{% url 'material_history' material.pk %}" class="btn btn-sm btn-info me-2">История</a>
-                            <a href="{% url 'material_update' material.pk %}" class="btn btn-sm btn-warning me-2">Изменить</a>
-                            <a href="{% url 'material_delete' material.pk %}" class="btn btn-sm btn-danger">Удалить</a>
+                            <strong>{{ material.name }}</strong>
+                            {% if material.current_quantity == 0 %}
+                                <span class="badge bg-danger ms-1">Нет в наличии</span>
+                            {% elif material.current_quantity < material.min_threshold %}
+                                <span class="badge bg-warning ms-1">Мало</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Категория -->
+                        <td>
+                            {% if material.category %}
+                                <span class="badge bg-info text-dark">{{ material.category.name }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Без категории</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Количество -->
+                        <td>
+                            <strong>{{ material.current_quantity }}</strong>
+                        </td>
+
+                        <!-- Единица измерения -->
+                        <td>
+                            <span class="badge bg-light text-dark">{{ material.unit }}</span>
+                        </td>
+
+                        <!-- Срок годности -->
+                        <td>
+                            {% if material.expiration_date %}
+                                {{ material.expiration_date|date:"d.m.Y" }}
+                                {% if material.expiry_status == 'expired' %}
+                                    <span class="badge bg-danger d-block mt-1">Просрочен</span>
+                                {% elif material.expiry_status == 'soon' %}
+                                    <span class="badge bg-warning d-block mt-1">Скоро истекает</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">Не указан</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Порог -->
+                        <td>
+                            <span class="badge bg-secondary">{{ material.min_threshold }}</span>
+                        </td>
+
+                        <!-- Действия -->
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'material_history' material.pk %}"
+                                   class="btn btn-sm btn-outline-info" title="История">
+                                    <i class="bi bi-clock-history"></i>
+                                </a>
+                                <a href="{% url 'material_update' material.pk %}"
+                                   class="btn btn-sm btn-outline-warning" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'material_delete' material.pk %}"
+                                   class="btn btn-sm btn-outline-danger" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center">Склад пуст. Добавьте первый материал.</td>
+                        <td colspan="8" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                                <p class="mt-2">Материалы не найдены</p>
+                                {% if search_query or selected_category or selected_expiry %}
+                                    <p>Попробуйте изменить параметры фильтрации</p>
+                                    <a href="{% url 'material_list' %}" class="btn btn-sm btn-outline-primary">
+                                        Сбросить фильтры
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'material_create' %}" class="btn btn-sm btn-primary">
+                                        Добавить первый материал
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </form> <!-- Закрываем форму фильтрации -->
 
+    <!-- Статистика -->
+    {% if materials %}
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body py-2">
+                    <div class="row text-center">
+                        <div class="col">
+                            <small class="text-muted">Всего материалов:</small>
+                            <h5 class="mb-0">{{ total_count|default:materials.count }}</h5>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">Критический остаток:</small>
+                            <h5 class="mb-0 text-danger">{{ critical_count|default:0 }}</h5>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">Ниже порога:</small>
+                            <h5 class="mb-0 text-warning">{{ below_threshold_count|default:0 }}</h5>
+                        </div>
+                        <div class="col">
+                            <small class="text-muted">С истекающим сроком:</small>
+                            <h5 class="mb-0 text-warning">{{ soon_expiry_count|default:0 }}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
-{% endblock content %}
+<!-- Обновленный JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterForm = document.getElementById('filterForm');
+    const searchForm = document.getElementById('searchForm');
+    const mainSearch = document.getElementById('mainSearch');
+    const tableSearch = document.getElementById('tableSearch');
+
+    // Синхронизация двух полей поиска
+    function syncSearchFields() {
+        mainSearch.value = tableSearch.value;
+    }
+
+    mainSearch.addEventListener('input', syncSearchFields);
+    tableSearch.addEventListener('input', syncSearchFields);
+
+    // При изменении select в таблице отправляем главную форму
+    document.querySelectorAll('select').forEach(function(select) {
+        select.addEventListener('change', function() {
+            // Копируем значение из поля поиска в таблице в главную форму
+            const searchInput = document.createElement('input');
+            searchInput.type = 'hidden';
+            searchInput.name = 'search';
+            searchInput.value = tableSearch.value;
+            filterForm.appendChild(searchInput);
+
+            filterForm.submit();
+        });
+    });
+
+    // При нажатии Enter в любом поле поиска
+    [mainSearch, tableSearch].forEach(function(input) {
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+
+                if (input === mainSearch) {
+                    // Отправляем форму поиска
+                    searchForm.submit();
+                } else {
+                    // Отправляем форму фильтрации с учетом всех параметров
+                    filterForm.submit();
+                }
+            }
+        });
+    });
+
+    // При отправке формы поиска в заголовке копируем значение в табличное поле
+    searchForm.addEventListener('submit', function(e) {
+        tableSearch.value = mainSearch.value;
+    });
+});
+</script>
+
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+<style>
+.table th {
+    position: relative;
+}
+.table th .form-control-sm,
+.table th .form-select-sm {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.4rem;
+}
+.table-danger {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+.table-warning {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+.table-light {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

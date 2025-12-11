@@ -1,19 +1,109 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Material
+from .models import Material, Category
 from .forms import MaterialForm
 from django.contrib.auth.decorators import login_required
+from datetime import date, timedelta
+
 
 @login_required
 def material_list(request):
-    # 1. Получаем все материалы из Базы Данных
+    """Список материалов с фильтрацией"""
+
+    # 1. Получаем базовый набор материалов пользователя
     materials = Material.objects.filter(user=request.user)
 
-    # 2. Готовим данные для передачи в шаблон (контекст)
+    # 2. Получаем параметры фильтрации
+    search_query = request.GET.get('search', '')
+    category_id = request.GET.get('category', '')
+    expiry_filter = request.GET.get('expiry', '')
+    today = date.today()
+
+    # 3. Применяем фильтры
+    if search_query:
+        materials = materials.filter(
+            name__icontains=search_query
+        ) | materials.filter(
+            article_number__icontains=search_query
+        )
+
+    if category_id:
+        materials = materials.filter(category_id=category_id)
+
+    if expiry_filter:
+        if expiry_filter == 'expired':
+            materials = materials.filter(expiration_date__lt=today)
+        elif expiry_filter == 'expires_soon':
+            soon_date = today + timedelta(days=30)
+            materials = materials.filter(
+                expiration_date__gte=today,
+                expiration_date__lte=soon_date
+            )
+        elif expiry_filter == 'no_expiry':
+            materials = materials.filter(expiration_date__isnull=True)
+
+    # 4. Получаем категории для выпадающего списка
+    categories = Category.objects.filter(user=request.user)
+
+    # 5. Добавляем цветовую маркировку и считаем статистику (ТВОЙ КОД)
+    total_count = materials.count()
+    critical_count = 0
+    below_threshold_count = 0
+    soon_expiry_count = 0
+
+    # В цикле for material in materials:
+    for material in materials:
+        is_critical = False
+
+        # Проверяем количество
+        if material.current_quantity == 0:
+            is_critical = True
+            material.quantity_status = 'none'
+
+        # Проверяем срок годности
+        if material.expiration_date:
+            days_left = (material.expiration_date - today).days
+            if days_left < 0:
+                is_critical = True
+                material.expiry_status = 'expired'
+                material.expiry_label = 'Просрочен'
+            elif days_left <= 30:
+                material.expiry_status = 'soon'
+                material.expiry_label = 'Скоро истекает'
+                soon_expiry_count += 1
+            else:
+                material.expiry_status = 'ok'
+                material.expiry_label = 'ОК'
+        else:
+            material.expiry_status = 'no_date'
+            material.expiry_label = 'Не указан'
+
+        # Проверяем порог (только если не критический)
+        if material.current_quantity < material.min_threshold and material.current_quantity > 0:
+            below_threshold_count += 1
+
+        # Устанавливаем цвет строки
+        if is_critical:
+            material.row_class = 'table-danger'
+            critical_count += 1
+        elif material.current_quantity < material.min_threshold and material.current_quantity > 0:
+            material.row_class = 'table-warning'
+        else:
+            material.row_class = 'table-light'
+
+    # 6. Готовим контекст (ВАЖНО: ДОБАВЬ ЭТО!)
     context = {
-        'materials': materials
+        'materials': materials,
+        'categories': categories,
+        'today': today,
+        'search_query': search_query,
+        'selected_category': category_id,
+        'selected_expiry': expiry_filter,
+        'total_count': total_count,
+        'critical_count': critical_count,
+        'below_threshold_count': below_threshold_count,
+        'soon_expiry_count': soon_expiry_count,
     }
 
-    # 3. Отдаем пользователю HTML-шаблон с этими данными
     return render(request, 'materials/material_list.html', context)
 
 @login_required
