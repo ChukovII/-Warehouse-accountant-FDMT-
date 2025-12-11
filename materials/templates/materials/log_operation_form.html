@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="mt-5">
+    <div class="card shadow p-4">
+
+        {# Улучшенный заголовок #}
+        <h1>
+            <i class="fas fa-edit me-2"></i> Журнал операций
+        </h1>
+        <h3 class="text-muted">
+            Материал: **{{ material.name }}** <span class="badge bg-secondary ms-3">Текущий остаток: {{ material.current_quantity }} {{ material.unit }}</span>
+        </h3>
+        <hr>
+
+        <form method="post" class="mt-3">
+            {% csrf_token %}
+
+            {{ form.non_field_errors }}
+
+            {# 1. Блок для Типа Операции (Самый важный, выделяем его) #}
+            <div class="mb-4 p-3 border rounded bg-light">
+                <label class="form-label fs-5 fw-bold mb-3">
+                    <i class="fas fa-cogs me-2"></i> {{ form.operation_type.label }}
+                </label>
+
+                <div class="d-flex flex-wrap gap-3">
+                    {% for choice in form.operation_type %}
+
+    {# 1. Определяем иконку и цвет #}
+        {% if choice.data.value == 'IN' %}
+            {% with icon_class='fas fa-arrow-up' color_class='btn-outline-success' is_checked=choice.data.selected %}
+            {% endwith %}
+        {% elif choice.data.value == 'OUT' %}
+            {% with icon_class='fas fa-arrow-down' color_class='btn-outline-warning' is_checked=choice.data.selected %}
+            {% endwith %}
+        {% elif choice.data.value == 'DISP' %}
+            {% with icon_class='fas fa-trash-alt' color_class='btn-outline-danger' is_checked=choice.data.selected %}
+            {% endwith %}
+        {% else %}
+            {% with icon_class='fas fa-question' color_class='btn-outline-secondary' is_checked=choice.data.selected %}
+            {% endwith %}
+        {% endif %}
+
+        {# 2. Выводим сам INPUT с РУЧНЫМ добавлением класса btn-check #}
+        {# Атрибуты берутся из choice.data #}
+        <input
+            type="radio"
+            name="{{ choice.data.name }}"
+            id="{{ choice.id_for_label }}"
+            value="{{ choice.data.value }}"
+            class="btn-check"
+            {% if is_checked %}checked{% endif %}
+        >
+
+        {# 3. Выводим LABEL (метку) с обязательным атрибутом 'for' #}
+        <label class="btn {{ color_class }} fw-bold" for="{{ choice.id_for_label }}">
+            <i class="{{ icon_class }} me-1"></i> {{ choice.choice_label }}
+        </label>
+    {% endfor %}
+    {{ form.operation_type.errors }}
+</div>
+            </div>
+
+            {# 2. Блок для Количество и Даты #}
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="{{ form.quantity.id_for_label }}" class="form-label fw-bold">
+                        <i class="fas fa-sort-numeric-up me-1"></i> {{ form.quantity.label }} ({{ material.unit }})
+                    </label>
+                    {{ form.quantity|add_class:'form-control' }}
+                    {{ form.quantity.errors }}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="{{ form.date.id_for_label }}" class="form-label fw-bold">
+                        <i class="fas fa-calendar-alt me-1"></i> {{ form.date.label }}
+                    </label>
+                    {{ form.date|add_class:'form-control' }}
+                    {{ form.date.errors }}
+                </div>
+            </div>
+
+            {# 3. Блок для Комментария #}
+            <div class="mb-4">
+                <label for="{{ form.comment.id_for_label }}" class="form-label fw-bold">
+                    <i class="fas fa-comment-alt me-1"></i> {{ form.comment.label }} (Необязательно)
+                </label>
+                {{ form.comment|add_class:'form-control' }}
+                {{ form.comment.errors }}
+            </div>
+
+
+            <button type="submit" class="btn btn-success btn-lg mt-3 me-3">
+                <i class="fas fa-check me-2"></i> Зафиксировать
+            </button>
+            <a href="{% url 'material_list' %}" class="btn btn-secondary btn-lg mt-3">
+                <i class="fas fa-times me-2"></i> Отмена
+            </a>
+        </form>
+    </div>
+</div>
+{% endblock content %}

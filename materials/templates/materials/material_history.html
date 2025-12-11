@@ -2,18 +2,84 @@
 
 {% block content %}
 <div class="mt-5">
-    <h1>История материала: {{ material.name }}</h1>
-    <p>Здесь будет отображаться таблица с историей прихода и расхода.</p>
-    <a href="{% url 'material_list' %}" class="btn btn-secondary">Назад к складу</a>
+    <h1 class="mb-4">
+        📜 История операций: **{{ material.name }}**
+        <small class="text-muted fs-5 ms-3">(Текущий остаток: {{ material.current_quantity }} {{ material.unit }})</small>
+    </h1>
 
-    <ul class="list-group mt-3">
-        {% for item in history %}
-            <li class="list-group-item">
-                {{ item.date }} - Изменение: {{ item.change }}
-            </li>
-        {% empty %}
-            <li class="list-group-item">Нет данных по истории использования.</li>
-        {% endfor %}
-    </ul>
+    <a href="{% url 'log_operation' material.pk %}" class="btn btn-primary mb-3 me-2">Добавить операцию</a>
+    <a href="{% url 'material_list' %}" class="btn btn-secondary mb-3">Назад к складу</a>
+
+    <div class="card shadow">
+        <div class="card-body">
+            <table class="table table-hover table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Тип операции</th>
+                        <th>Количество</th>
+                        <th>Сотрудник</th>
+                        <th>Комментарий</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in history %}
+                    {% comment %}
+                    Используем get_operation_type_display, чтобы получить красивое имя
+                    ('Приход' вместо 'IN', 'Расход' вместо 'OUT').
+                    {% endcomment %}
+
+                    {# Определяем класс для цветовой маркировки строки #}
+                    {% if item.operation_type == 'IN' %}
+                        {% with row_class='table-success' %}{% endwith %}
+                    {% elif item.operation_type == 'OUT' %}
+                        {% with row_class='table-warning' %}{% endwith %}
+                    {% elif item.operation_type == 'DISP' %}
+                        {% with row_class='table-danger' %}{% endwith %}
+                    {% else %}
+                        {% with row_class='table-light' %}{% endwith %}
+                    {% endif %}
+
+                    <tr class="{{ row_class }}">
+    <td>{{ item.date|date:"d.m.Y" }}</td>
+    <td>
+        {% if item.operation_type == 'IN' %}
+            <span class="text-success fw-bold">
+                <i class="fas fa-arrow-up"></i> Приход
+            </span>
+        {% elif item.operation_type == 'OUT' %}
+            <span class="text-warning fw-bold">
+                <i class="fas fa-arrow-down"></i> Расход
+            </span>
+        {% elif item.operation_type == 'DISP' %}
+            <span class="text-danger fw-bold">
+                <i class="fas fa-trash-alt"></i> Списание
+            </span>
+        {% else %}
+            {{ item.get_operation_type_display }}
+        {% endif %}
+    </td>
+    <td class="fw-bold">
+        {% if item.operation_type == 'IN' %}
+            <span class="text-success">+{{ item.quantity }}</span>
+        {% else %}
+            <span class="text-danger">-{{ item.quantity }}</span>
+        {% endif %}
+        {{ material.unit }}
+    </td>
+
+    <td>{{ item.user.username|default:"Система" }}</td>
+    <td>{{ item.comment|default:"-" }}</td>
+</tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">Пока нет записей об операциях с этим материалом.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
 </div>
 {% endblock content %}

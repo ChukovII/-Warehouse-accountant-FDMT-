@@ -46,15 +46,32 @@ class Material(models.Model):
 
 # 2. Таблица истории (Для обучения ИИ)
 class UsageHistory(models.Model):
+    # Константы для типов операций
+    OPERATION_CHOICES = [
+        ('IN', 'Приход (Закупка)'),
+        ('OUT', 'Расход (Продажа/Производство)'),
+        ('DISP', 'Списание (Брак/Просрочка)'),
+        # ('MOVE', 'Перемещение', пока не делаем)
+    ]
     # Связь с таблицей Material. Если удалим материал — удалится и история (CASCADE)
     material = models.ForeignKey(Material, on_delete=models.CASCADE, verbose_name="Материал")
-    date = models.DateField(verbose_name="Дата расхода")
-    quantity_used = models.FloatField(verbose_name="Расход")
+    date = models.DateField(verbose_name="Дата операции", default=timezone.now)
+    # Поле для записи количества (всегда положительное)
+    quantity = models.FloatField(verbose_name="Количество")
+    # Тип операции (обязательно для отчетности)
+    operation_type = models.CharField(max_length=5, choices=OPERATION_CHOICES, verbose_name="Тип операции")
+    comment = models.TextField(blank=True, verbose_name="Комментарий")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Сотрудник")
+    operation_type = models.CharField(
+        max_length=4,
+        choices=OPERATION_CHOICES,
+        verbose_name="Тип операции",
+        default='OUT'
+    )
+    class Meta:
+        verbose_name = "История операций"
+        verbose_name_plural = "История операций"
+        ordering = ['-date']
 
     def __str__(self):
-        return f"{self.material.name} | {self.date}: {self.change}"
-
-    class Meta:
-        verbose_name = "История использования"
-        verbose_name_plural = "История использования"
-        ordering = ['-date']  # Сортировка по дате (сначала новые)
+        return f"{self.material.name} | {self.operation_type} {self.quantity} от {self.date}"

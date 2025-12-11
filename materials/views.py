@@ -3,7 +3,8 @@ from .models import Material, Category
 from .forms import MaterialForm
 from django.contrib.auth.decorators import login_required
 from datetime import date, timedelta
-
+from django.db import transaction
+from .forms import MaterialForm, UsageForm
 
 @login_required
 def material_list(request):
@@ -168,3 +169,46 @@ def material_history(request, pk):
         'history': history,
     }
     return render(request, 'materials/material_history.html', context)
+
+@login_required
+def log_operation(request, pk):
+    # 1. Получаем материал, с которым работаем
+    material = get_object_or_404(Material, pk=pk, user=request.user)
+
+    if request.method == 'POST':
+        form = UsageForm(request.POST)
+        if form.is_valid():
+
+            operation_type = form.cleaned_data['operation_type']
+            quantity = form.cleaned_data['quantity']
+
+            # Мы используем транзакцию, чтобы гарантировать, что либо обе записи (History и Material) сохранятся, либо ни одна.
+            with transaction.atomic():
+                # 1. Сохраняем запись в Историю
+                history_entry = form.save(commit=False)
+                history_entry.material = material
+                history_entry.user = request.user # Присваиваем текущего пользователя
+                history_entry.save()
+
+                # 2. Обновляем текущее количество материала
+                if operation_type == 'IN':
+                    # Приход: +
+                    material.current_quantity += quantity
+                elif operation_type == 'OUT' or operation_type == 'DISP':
+                    # Расход/Списание: -
+                    material.current_quantity -= quantity
+
+                # Защита от отрицательного остатка (опционально, но полезно)
+                material.current_quantity = max(0, material.current_quantity)
+
+                material.save()
+
+            return redirect('material_list')
+    else:
+        form = UsageForm()
+
+    context = {
+        'form': form,
+        'material': material,
+    }
+    return render(request, 'materials/log_operation_form.html', context)

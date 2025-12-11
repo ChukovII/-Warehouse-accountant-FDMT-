@@ -21,3 +21,25 @@ def __init__(self, *args, **kwargs):
         # Фильтруем категории по текущему пользователю
         # И делаем его необязательным для миграции
         self.fields['category'].queryset = Category.objects.filter(user=user)
+
+class UsageForm(forms.ModelForm):
+    # Мы скрываем поле material, так как будем передавать его через URL (pk)
+    # Мы скрываем user, так как присвоим его в views.py
+
+    # Добавляем поле, чтобы пользователь мог выбрать, какую операцию он совершает
+    operation_type = forms.ChoiceField(
+        choices=[
+            ('IN', 'Приход (Закупка)'),
+            ('OUT', 'Расход (Отгрузка)'),
+            ('DISP', 'Списание (Брак/Просрочка)'),
+        ],
+        label="Тип операции",
+        widget=forms.RadioSelect # Удобные радио-кнопки
+    )
+
+    class Meta:
+        model = UsageHistory
+        fields = ['operation_type', 'quantity', 'date', 'comment']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date'}), # Удобный календарь
+        }

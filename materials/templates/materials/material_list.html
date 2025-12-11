@@ -167,9 +167,12 @@
                             <span class="badge bg-secondary">{{ material.min_threshold }}</span>
                         </td>
 
-                        <!-- Действия -->
-                        <td>
+<td>
                             <div class="btn-group" role="group">
+                                <a href="{% url 'log_operation' material.pk %}"
+                                   class="btn btn-sm btn-primary" title="Операция (Приход/Расход)">
+                                    <i class="bi bi-journal-check"></i>
+                                </a>
                                 <a href="{% url 'material_history' material.pk %}"
                                    class="btn btn-sm btn-outline-info" title="История">
                                     <i class="bi bi-clock-history"></i>
