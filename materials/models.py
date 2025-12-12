@@ -59,11 +59,10 @@ class UsageHistory(models.Model):
     # Поле для записи количества (всегда положительное)
     quantity = models.FloatField(verbose_name="Количество")
     # Тип операции (обязательно для отчетности)
-    operation_type = models.CharField(max_length=5, choices=OPERATION_CHOICES, verbose_name="Тип операции")
     comment = models.TextField(blank=True, verbose_name="Комментарий")
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Сотрудник")
     operation_type = models.CharField(
-        max_length=4,
+        max_length=4,  # или 4, смотри какая миграция
         choices=OPERATION_CHOICES,
         verbose_name="Тип операции",
         default='OUT'

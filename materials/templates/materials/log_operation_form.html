@@ -10,7 +10,8 @@
             <i class="fas fa-edit me-2"></i> Журнал операций
         </h1>
         <h3 class="text-muted">
-            Материал: **{{ material.name }}** <span class="badge bg-secondary ms-3">Текущий остаток: {{ material.current_quantity }} {{ material.unit }}</span>
+            Материал: <strong>{{ material.name }}</strong>
+            <span class="badge bg-secondary ms-3">Текущий остаток: {{ material.current_quantity }} {{ material.unit }}</span>
         </h3>
         <hr>
 
@@ -27,40 +28,32 @@
 
                 <div class="d-flex flex-wrap gap-3">
                     {% for choice in form.operation_type %}
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="{{ form.operation_type.name }}"
+                                   id="op_{{ choice.data.value }}"
+                                   value="{{ choice.data.value }}"
+                                   {% if choice.data.selected %}checked{% endif %}>
 
-    {# 1. Определяем иконку и цвет #}
-        {% if choice.data.value == 'IN' %}
-            {% with icon_class='fas fa-arrow-up' color_class='btn-outline-success' is_checked=choice.data.selected %}
-            {% endwith %}
-        {% elif choice.data.value == 'OUT' %}
-            {% with icon_class='fas fa-arrow-down' color_class='btn-outline-warning' is_checked=choice.data.selected %}
-            {% endwith %}
-        {% elif choice.data.value == 'DISP' %}
-            {% with icon_class='fas fa-trash-alt' color_class='btn-outline-danger' is_checked=choice.data.selected %}
-            {% endwith %}
-        {% else %}
-            {% with icon_class='fas fa-question' color_class='btn-outline-secondary' is_checked=choice.data.selected %}
-            {% endwith %}
-        {% endif %}
-
-        {# 2. Выводим сам INPUT с РУЧНЫМ добавлением класса btn-check #}
-        {# Атрибуты берутся из choice.data #}
-        <input
-            type="radio"
-            name="{{ choice.data.name }}"
-            id="{{ choice.id_for_label }}"
-            value="{{ choice.data.value }}"
-            class="btn-check"
-            {% if is_checked %}checked{% endif %}
-        >
-
-        {# 3. Выводим LABEL (метку) с обязательным атрибутом 'for' #}
-        <label class="btn {{ color_class }} fw-bold" for="{{ choice.id_for_label }}">
-            <i class="{{ icon_class }} me-1"></i> {{ choice.choice_label }}
-        </label>
-    {% endfor %}
-    {{ form.operation_type.errors }}
-</div>
+                            {# УДАЛИЛ кастомный класс, используем только стандартные Bootstrap классы #}
+                            <label class="form-check-label btn btn-outline-{% if choice.data.value == 'IN' %}success{% elif choice.data.value == 'OUT' %}warning{% elif choice.data.value == 'DISP' %}danger{% else %}secondary{% endif %}"
+                                   for="op_{{ choice.data.value }}">
+                                {% if choice.data.value == 'IN' %}
+                                    <i class="fas fa-arrow-up"></i>
+                                {% elif choice.data.value == 'OUT' %}
+                                    <i class="fas fa-arrow-down"></i>
+                                {% elif choice.data.value == 'DISP' %}
+                                    <i class="fas fa-trash-alt"></i>
+                                {% else %}
+                                    <i class="fas fa-question"></i>
+                                {% endif %}
+                                {{ choice.choice_label }}
+                            </label>
+                        </div>
+                    {% endfor %}
+                </div>
+                {{ form.operation_type.errors }}
             </div>
 
             {# 2. Блок для Количество и Даты #}
@@ -100,4 +93,57 @@
         </form>
     </div>
 </div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<style>
+/* Дополнительные стили для кнопок выбора операции */
+.form-check-input {
+    display: none; /* Скрываем стандартные радио-кнопки */
+}
+
+.form-check-label.btn {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-width: 2px;
+    transition: all 0.3s ease;
+}
+
+.form-check-input:checked + .form-check-label.btn {
+    border-width: 3px;
+    font-weight: bold;
+}
+
+/* ИСПРАВЛЕНИЕ: Принудительно делаем текст черным при наведении и активации,
+   используя более светлые фоны при наведении, чтобы не вызывать автоматический белый текст. */
+
+/* Переопределяем поведение hover для всех трех кнопок */
+.btn-outline-success:hover,
+.btn-outline-warning:hover,
+.btn-outline-danger:hover {
+    color: #212529 !important; /* ЧЕРНЫЙ текст и иконки при наведении */
+}
+
+/* Переопределяем фон для hover (делаем его светлым, чтобы текст оставался черным) */
+.btn-outline-success:hover {
+    background-color: rgba(25, 135, 84, 0.1);
+}
+
+.btn-outline-warning:hover {
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.btn-outline-danger:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Гарантируем, что активный (выбранный) элемент тоже черный, если его фон не темный */
+.form-check-input:checked + .form-check-label.btn-outline-success,
+.form-check-input:checked + .form-check-label.btn-outline-warning,
+.form-check-input:checked + .form-check-label.btn-outline-danger {
+    color: #212529; /* ЧЕРНЫЙ текст и иконки, когда кнопка ВЫБРАНА */
+    /* Здесь нам нужно сохранить стандартный фон Bootstrap для "выбранности" */
+}
+
+</style>
 {% endblock content %}
