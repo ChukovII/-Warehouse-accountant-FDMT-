@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'materials',
+    'django.contrib.sites',
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
@@ -133,9 +134,10 @@ AUTHENTICATION_BACKENDS = [
     # allauth specific (для регистрации/входа)
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
+SITE_ID = 1
 # Куда перенаправлять пользователя после успешного входа (на главную страницу)
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/materials/list/'
 # Куда перенаправлять пользователя после выхода (на главную страницу)
-LOGOUT_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/accounts/login/'
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"

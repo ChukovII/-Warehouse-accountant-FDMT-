@@ -31,24 +31,49 @@
 
     /* --- ГАРАНТИРОВАННЫЙ ФИКС ДЛЯ btn-outline-warning (Расход) --- */
 
-    /* 1. НЕАКТИВНОЕ СОСТОЯНИЕ: Текст ЖЕЛТЫЙ, Фон ПРОЗРАЧНЫЙ.
-       Мы используем очень специфичный селектор, чтобы перебить любые конфликты. */
+    /* 1. НЕАКТИВНОЕ СОСТОЯНИЕ (База, когда не выбрано и нет фокуса) */
     .form-check-label.btn-outline-warning {
         color: #ffc107 !important; /* Желтый текст */
         background-color: transparent !important; /* Прозрачный фон */
         border-color: #ffc107 !important; /* Желтый бордер */
+        box-shadow: none !important; /* Сброс тени, которая может имитировать активность */
     }
 
-    /* 2. СОСТОЯНИЕ ВЫБРАНО ИЛИ НАВЕДЕНИЕ (Текст белый, Фон желтый) */
-    /* Используем селектор input:checked + label для выбранного состояния */
-    .form-check-input:checked + .form-check-label.btn-outline-warning,
-    /* И обычный hover для состояния наведения */
-    .form-check-label.btn-outline-warning:hover {
+    /* 2. СОСТОЯНИЕ ВЫБРАНО ИЛИ НАВЕДЕНИЕ */
+
+    /* Стиль, когда кнопка выбрана (чекбокс активен) */
+    .form-check-input:checked + .form-check-label.btn-outline-warning {
         color: #fff !important; /* Белый текст */
         background-color: #ffc107 !important; /* Желтый фон */
         border-color: #ffc107 !important; /* Желтый бордер */
+        /* Добавляем тень, соответствующую активному состоянию Bootstrap */
         box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.5) !important;
     }
+
+    /* Стиль при наведении курсора (hover) */
+    .form-check-label.btn-outline-warning:hover {
+        color: #fff !important;
+        background-color: #ffc107 !important;
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.5) !important;
+    }
+
+    /* 3. СБРОС ФОКУСА/АКТИВНОГО СОСТОЯНИЯ */
+    /* Важно! Переопределяем стили Bootstrap, которые сохраняют фон после клика/фокуса */
+    .form-check-label.btn-outline-warning:focus,
+    .form-check-label.btn-outline-warning:active {
+        color: #ffc107 !important; /* Желтый текст */
+        background-color: transparent !important; /* Сброс фона на прозрачный */
+        box-shadow: none !important; /* Убираем все тени */
+    }
+
+    /* Дополнительное правило для сброса состояния .active:after, если оно применяется Bootstrap-ом */
+    .form-check-input:not(:checked) + .form-check-label.btn-outline-warning:focus {
+        color: #ffc107 !important;
+        background-color: transparent !important;
+        box-shadow: 0 0 0 0.25rem rgba(255, 193, 7, 0.5) !important; /* оставляем тень фокуса, но не фон */
+    }
+
     </style>
 
 </head>
@@ -64,14 +89,21 @@
                             <span class="nav-link">Привет, {{ user.username }}!</span>
                         </li>
                         <li class="nav-item">
-                            <a class="btn btn-outline-danger" href="{% url 'logout' %}">Выйти</a>
+                            <form method="post" action="{% url 'account_logout' %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger">
+                                    Выйти
+                                </button>
+                            </form>
                         </li>
                     {% else %}
+                        {# ИСПРАВЛЕНИЕ: Заменяем 'login' на 'account_login' #}
                         <li class="nav-item">
-                            <a class="btn btn-outline-success me-2" href="{% url 'login' %}">Войти</a>
+                            <a class="btn btn-outline-success me-2" href="{% url 'account_login' %}">Войти</a>
                         </li>
+                        {# ИСПРАВЛЕНИЕ: Заменяем 'signup' на 'account_signup' #}
                         <li class="nav-item">
-                            <a class="btn btn-success" href="{% url 'signup' %}">Регистрация</a>
+                            <a class="btn btn-success" href="{% url 'account_signup' %}">Регистрация</a>
                         </li>
                     {% endif %}
                 </ul>
