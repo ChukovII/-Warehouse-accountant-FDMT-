@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>📊 {{ report_title }}</h2>
+    <p class="text-muted">Анализ показывает, насколько быстро материалы используются и замещаются.</p>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <p>Период анализа: {{ start_date|date:"d.m.Y" }} — {{ end_date|date:"d.m.Y" }}</p>
+        </div>
+        <div class="col-md-6 text-end">
+            <form method="get" class="d-inline-flex">
+                <label for="days" class="me-2 col-form-label-sm">Показать за последние:</label>
+                <select name="days" id="days" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="30" {% if days == 30 %}selected{% endif %}>30 дней</option>
+                    <option value="60" {% if days == 60 %}selected{% endif %}>60 дней</option>
+                    <option value="90" {% if days == 90 %}selected{% endif %}>90 дней (3 мес)</option>
+                    <option value="180" {% if days == 180 %}selected{% endif %}>180 дней (6 мес)</option>
+                    <option value="365" {% if days == 365 %}selected{% endif %}>365 дней (год)</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th width="25%">Материал</th>
+                    <th width="15%">Нач. остаток</th> <th width="15%">Средний запас</th> <th width="15%">Общий расход ({{ days }} дн)</th>
+                    <th width="15%">Текущий остаток</th>
+                    <th width="15%">Коэффициент оборачиваемости</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in report_data %}
+                <tr>
+                    <td>
+                        <a href="{% url 'material_history' item.material_id %}">
+                            <strong>{{ item.name }}</strong>
+                        </a>
+                    </td>
+                    <td>{{ item.start_stock|floatformat:2 }}</td> <td>{{ item.average_stock|floatformat:2 }}</td> <td>{{ item.total_usage }}</td>
+                    <td>{{ item.current_stock }}</td>
+                    <td>
+                        {% if item.turnover_rate is not None %}
+                            <strong class="text-primary">{{ item.turnover_rate|floatformat:2 }}</strong>
+                            {% if item.turnover_rate > 5 %}
+                                <span class="badge bg-success ms-2">Высокая</span>
+                            {% elif item.turnover_rate < 1 %}
+                                <span class="badge bg-danger ms-2">Низкая (Риск)</span>
+                            {% else %}
+                                <span class="badge bg-info text-dark ms-2">Средняя</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">— Нет данных / Не использовался</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted"> Нет данных об операциях за выбранный период.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

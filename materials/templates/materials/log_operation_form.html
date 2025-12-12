@@ -5,7 +5,6 @@
 <div class="mt-5">
     <div class="card shadow p-4">
 
-        {# Улучшенный заголовок #}
         <h1>
             <i class="fas fa-edit me-2"></i> Журнал операций
         </h1>
@@ -20,7 +19,7 @@
 
             {{ form.non_field_errors }}
 
-            {# 1. Блок для Типа Операции (Самый важный, выделяем его) #}
+            {# 1. Блок для Типа Операции #}
             <div class="mb-4 p-3 border rounded bg-light">
                 <label class="form-label fs-5 fw-bold mb-3">
                     <i class="fas fa-cogs me-2"></i> {{ form.operation_type.label }}
@@ -36,7 +35,6 @@
                                    value="{{ choice.data.value }}"
                                    {% if choice.data.selected %}checked{% endif %}>
 
-                            {# УДАЛИЛ кастомный класс, используем только стандартные Bootstrap классы #}
                             <label class="form-check-label btn btn-outline-{% if choice.data.value == 'IN' %}success{% elif choice.data.value == 'OUT' %}warning{% elif choice.data.value == 'DISP' %}danger{% else %}secondary{% endif %}"
                                    for="op_{{ choice.data.value }}">
                                 {% if choice.data.value == 'IN' %}
@@ -66,11 +64,11 @@
                     {{ form.quantity.errors }}
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label for="{{ form.date.id_for_label }}" class="form-label fw-bold">
-                        <i class="fas fa-calendar-alt me-1"></i> {{ form.date.label }}
+                    <label for="{{ form.operation_date.id_for_label }}" class="form-label fw-bold">
+                        <i class="fas fa-calendar-alt me-1"></i> {{ form.operation_date.label }}
                     </label>
-                    {{ form.date|add_class:'form-control' }}
-                    {{ form.date.errors }}
+                    {{ form.operation_date|add_class:'form-control' }}
+                    {{ form.operation_date.errors }}
                 </div>
             </div>
 
@@ -95,55 +93,4 @@
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
-<style>
-/* Дополнительные стили для кнопок выбора операции */
-.form-check-input {
-    display: none; /* Скрываем стандартные радио-кнопки */
-}
-
-.form-check-label.btn {
-    padding: 10px 20px;
-    cursor: pointer;
-    border-width: 2px;
-    transition: all 0.3s ease;
-}
-
-.form-check-input:checked + .form-check-label.btn {
-    border-width: 3px;
-    font-weight: bold;
-}
-
-/* ИСПРАВЛЕНИЕ: Принудительно делаем текст черным при наведении и активации,
-   используя более светлые фоны при наведении, чтобы не вызывать автоматический белый текст. */
-
-/* Переопределяем поведение hover для всех трех кнопок */
-.btn-outline-success:hover,
-.btn-outline-warning:hover,
-.btn-outline-danger:hover {
-    color: #212529 !important; /* ЧЕРНЫЙ текст и иконки при наведении */
-}
-
-/* Переопределяем фон для hover (делаем его светлым, чтобы текст оставался черным) */
-.btn-outline-success:hover {
-    background-color: rgba(25, 135, 84, 0.1);
-}
-
-.btn-outline-warning:hover {
-    background-color: rgba(255, 193, 7, 0.1);
-}
-
-.btn-outline-danger:hover {
-    background-color: rgba(220, 53, 69, 0.1);
-}
-
-/* Гарантируем, что активный (выбранный) элемент тоже черный, если его фон не темный */
-.form-check-input:checked + .form-check-label.btn-outline-success,
-.form-check-input:checked + .form-check-label.btn-outline-warning,
-.form-check-input:checked + .form-check-label.btn-outline-danger {
-    color: #212529; /* ЧЕРНЫЙ текст и иконки, когда кнопка ВЫБРАНА */
-    /* Здесь нам нужно сохранить стандартный фон Bootstrap для "выбранности" */
-}
-
-</style>
 {% endblock content %}

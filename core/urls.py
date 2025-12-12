@@ -1,31 +1,18 @@
-"""
-URL configuration for core project.
+# core/urls.py
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic.base import RedirectView
 
 urlpatterns = [
-    # 1. Административная панель (самый специфичный)
+    # ГЛАВНЫЙ МАРШРУТ: Используем '/materials/list/' (permanent=False для избежания кэша)
+    path('', RedirectView.as_view(url='/materials/list/', permanent=False)),
+
     path('admin/', admin.site.urls),
 
-    # 2. Адреса для регистрации, входа, выхода (allauth)
-    # Это специфичный маршрут, начинающийся с 'accounts/'
-    path('accounts/', include('allauth.urls')),
+    # Все маршруты приложения materials
+    path('materials/', include('materials.urls')),
 
-    # 3. Адреса вашего приложения materials
-    # ВАЖНО: Маршрут '' (корень) должен идти ПОСЛЕДНИМ, чтобы не перехватывать другие адреса.
-    path('', include('materials.urls')),
+    # Маршруты для пользователей/авторизации (ЗДЕСЬ ОПРЕДЕЛЕН МАРШРУТ 'logout')
+    path('accounts/', include('django.contrib.auth.urls')),
 ]

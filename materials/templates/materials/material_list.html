@@ -29,6 +29,9 @@
             <a href="{% url 'material_create' %}" class="btn btn-success btn-sm">
                 <i class="bi bi-plus-circle"></i> Добавить материал
             </a>
+            <a href="{% url 'analytics_report' %}" class="btn btn-outline-info btn-sm ms-2">
+                <i class="bi bi-graph-up-arrow"></i> Отчеты и Аналитика
+            </a>
         </div>
     </div>
 
@@ -38,9 +41,7 @@
                 <thead class="table-dark">
                     <tr>
                         <th width="10%">Артикул</th>
-
                         <th width="25%">Название</th>
-
                         <th width="15%">
                             Категория
                             <div class="mt-1">
@@ -55,11 +56,8 @@
                                 </select>
                             </div>
                         </th>
-
                         <th width="10%">Кол-во</th>
-
                         <th width="5%">Ед.</th>
-
                         <th width="15%">
                             Срок годности
                             <div class="mt-1">
@@ -77,15 +75,15 @@
                                 </select>
                             </div>
                         </th>
-
                         <th width="10%">Порог</th>
-
                         <th width="10%">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for material in materials %}
-                    <tr class="{{ material.row_class }}">
+                    <tr class="{{ material.row_class }}"
+                        {% if material.row_class == 'table-warning' %}style="background-color: #FFEE90 !important;"{% endif %}>
+
                         <td>
                             {% if material.article_number %}
                                 <code>{{ material.article_number }}</code>
@@ -138,7 +136,6 @@
 
                         <td>
                             <div class="btn-group" role="group">
-                                {# ИЗМЕНЕНИЕ: btn-primary заменен на btn-outline-primary, чтобы фон появлялся при наведении #}
                                 <a href="{% url 'log_operation' material.pk %}"
                                    class="btn btn-sm btn-outline-primary" title="Операция (Приход/Расход)">
                                     <i class="bi bi-journal-check"></i>
@@ -181,7 +178,9 @@
                 </tbody>
             </table>
         </div>
-    </form> {% if materials %}
+    </form>
+
+    {% if materials %}
     <div class="row mt-3">
         <div class="col-md-12">
             <div class="card">
@@ -248,9 +247,6 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 .table-danger {
     background-color: rgba(220, 53, 69, 0.1);
-}
-.table-warning {
-    background-color: rgba(255, 193, 7, 0.1);
 }
 .table-light {
     background-color: #f8f9fa;

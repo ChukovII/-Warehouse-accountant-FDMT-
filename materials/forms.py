@@ -1,45 +1,49 @@
 # materials/forms.py
+
 from django import forms
-from .models import Material, Category, UsageHistory
+from .models import Material, UsageHistory
+from datetime import date  # <-- ДОБАВЛЕН ИМПОРТ date
+
 
 class MaterialForm(forms.ModelForm):
     class Meta:
-        # Основана на нашей модели Material
         model = Material
-        # Поля, которые пользователь будет заполнять
-        fields = ['category', 'article_number', 'name', 'unit',
-                  'expiration_date', 'current_quantity', 'min_threshold']
-        # Виджет для выбора даты
-        widgets = {
-            'expiration_date': forms.DateInput(attrs={'type': 'date'}),
-        }
+        fields = [
+            'name',
+            'article_number',
+            'category',
+            'current_quantity',
+            'min_threshold',
+            'unit',
+            'expiration_date'
+        ]
 
-def __init__(self, *args, **kwargs):
-    user = kwargs.pop('user', None)
-    super().__init__(*args, **kwargs)
-    if user:
-        # Фильтруем категории по текущему пользователю
-        # И делаем его необязательным для миграции
-        self.fields['category'].queryset = Category.objects.filter(user=user)
 
-class UsageForm(forms.ModelForm):
-    # Мы скрываем поле material, так как будем передавать его через URL (pk)
-    # Мы скрываем user, так как присвоим его в views.py
-
-    # Добавляем поле, чтобы пользователь мог выбрать, какую операцию он совершает
-    operation_type = forms.ChoiceField(
-        choices=[
-            ('IN', 'Приход (Закупка)'),
-            ('OUT', 'Расход (Отгрузка)'),
-            ('DISP', 'Списание (Брак/Просрочка)'),
-        ],
-        label="Тип операции",
-        widget=forms.RadioSelect # Удобные радио-кнопки
-    )
+class UsageHistoryForm(forms.ModelForm):
+    """
+    Форма для регистрации операций прихода/расхода (IN/OUT/DISP).
+    """
 
     class Meta:
         model = UsageHistory
-        fields = ['operation_type', 'quantity', 'date', 'comment']
+        fields = [
+            'quantity',
+            'operation_type',
+            'comment',
+            'operation_date'
+        ]
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date'}), # Удобный календарь
+            'operation_date': forms.DateInput(attrs={'type': 'date'}),
+            'comment': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # ИСПРАВЛЕНИЕ 1: Устанавливаем текущую дату по умолчанию, чтобы она отображалась
+        # Это решает проблему "пропавшей" даты
+        if self.initial.get('operation_date') is None:
+            self.initial['operation_date'] = date.today()
+
+        # ИСПРАВЛЕНИЕ 2: Используем класс OperationType для choices
+        self.fields['operation_type'].choices = UsageHistory.OperationType.choices
