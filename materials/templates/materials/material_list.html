@@ -138,19 +138,24 @@
                             <div class="btn-group" role="group">
                                 <a href="{% url 'log_operation' material.pk %}"
                                    class="btn btn-sm btn-outline-primary" title="Операция (Приход/Расход)">
-                                    <i class="bi bi-journal-check"></i>
+                                    <i class="bi bi-journal-check"></i> Операции
+                                </a>
+                                {# НОВАЯ КНОПКА ДЛЯ ПРОГНОЗА ИИ #}
+                                <a href="{% url 'material_forecast' pk=material.pk %}"
+                                   class="btn btn-sm btn-outline-success" title="Прогноз ИИ">
+                                     <i class="fas fa-magic"></i> ИИ прогноз
                                 </a>
                                 <a href="{% url 'material_history' material.pk %}"
                                    class="btn btn-sm btn-outline-info" title="История">
-                                    <i class="bi bi-clock-history"></i>
+                                    <i class="bi bi-clock-history"></i> История
                                 </a>
                                 <a href="{% url 'material_update' material.pk %}"
                                    class="btn btn-sm btn-outline-warning" title="Редактировать">
-                                    <i class="bi bi-pencil"></i>
+                                    <i class="bi bi-pencil"></i> Изменить
                                 </a>
                                 <a href="{% url 'material_delete' material.pk %}"
                                    class="btn btn-sm btn-outline-danger" title="Удалить">
-                                    <i class="bi bi-trash"></i>
+                                    <i class="bi bi-trash"></i> Удалить
                                 </a>
                             </div>
                         </td>

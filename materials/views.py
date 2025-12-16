@@ -7,9 +7,8 @@ from datetime import date, timedelta
 from .models import Material, Category, UsageHistory
 from .forms import MaterialForm, UsageHistoryForm
 from django.utils import timezone
+from forecasting.model_utils import get_recommendation
 
-
-# --- Основные операции ---
 
 @login_required
 def material_create(request):
@@ -278,3 +277,38 @@ def analytics_report(request):
     }
 
     return render(request, 'materials/analytics_report.html', context)
+
+
+@login_required
+def material_forecast(request, pk):
+    """
+    Представление для отображения прогноза спроса и рекомендаций
+    для конкретного материала.
+    """
+    material = get_object_or_404(Material, pk=pk, user=request.user)
+
+    # 1. Вызов основной функции ИИ-модуля
+    forecast_days = int(request.GET.get('days', 30))
+    recommendation_data = get_recommendation(
+        material_id=pk,
+        days_to_forecast=forecast_days
+    )
+
+    # *** НОВАЯ ЛОГИКА: Расчет классов и иконок в Python (КОРРЕКЦИЯ ОШИБКИ) ***
+    action = recommendation_data['action']
+    if action == 'PURCHASE':
+        recommendation_data['alert_class'] = 'alert-danger'
+        recommendation_data['icon_class'] = 'fas fa-shopping-cart'
+    elif action == 'DISPOSE':
+        recommendation_data['alert_class'] = 'alert-warning'
+        recommendation_data['icon_class'] = 'fas fa-trash-alt'
+    else:
+        recommendation_data['alert_class'] = 'alert-success'
+        recommendation_data['icon_class'] = 'fas fa-check-circle'
+    # *** КОНЕЦ НОВОЙ ЛОГИКИ ***
+
+    # Добавляем объект материала в контекст
+    recommendation_data['material'] = material
+
+    # 2. Формирование контекста и вывод
+    return render(request, 'materials/material_forecast.html', recommendation_data)

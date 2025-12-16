@@ -16,4 +16,5 @@ urlpatterns = [
 
     # Отчеты и Аналитика
     path('reports/analytics/', views.analytics_report, name='analytics_report'),
+    path('forecast/<int:pk>/', views.material_forecast, name='material_forecast'),
 ]
