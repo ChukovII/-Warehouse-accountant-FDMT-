@@ -1,116 +1,80 @@
-# forecasting/model_utils.py
-
 import pandas as pd
-from materials.models import UsageHistory, Material  # Импортируем наши модели
+from materials.models import UsageHistory, Material
 from sklearn.linear_model import LinearRegression
 import numpy as np
-from datetime import timedelta
+from datetime import timedelta, date
+import requests
+import uuid
+import urllib3
+import warnings
+
+# Отключаем лишние предупреждения в консоли
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# ШАГ 1: Вставь сюда свой Authorization key
+AUTH_DATA = "MDE5YjJkNjgtNzcxNC03YWM4LWJiYTEtNTAyYzQxOTcyYmRjOjM5MDQyNmM5LTNmY2YtNDZjYi1hOTkwLTIzNTJhOGFjODhiNw=="
+
+
+def get_giga_token():
+    """Получает Access Token (действует 30 минут)"""
+    url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'RqUID': str(uuid.uuid4()),
+        'Authorization': f'Basic {AUTH_DATA}'
+    }
+    payload = {'scope': 'GIGACHAT_API_PERS'}
+    try:
+        response = requests.post(url, headers=headers, data=payload, verify=False)
+        return response.json().get('access_token')
+    except Exception:
+        return None
+
 
 def get_historical_usage_data(material_id, days=180):
-    """
-    Извлекает данные расхода (OUT и DISP) для материала
-    за указанное количество дней и подготавливает временной ряд.
-    """
     try:
         material = Material.objects.get(pk=material_id)
     except Material.DoesNotExist:
         return None
-
-    # Определяем операции, которые являются расходом
     usage_types = [UsageHistory.OperationType.OUT, UsageHistory.OperationType.DISP]
-
-    # 1. Запрос данных из UsageHistory
     history_queryset = UsageHistory.objects.filter(
         material=material,
         operation_type__in=usage_types
     ).values('operation_date', 'quantity').order_by('operation_date')
-
-    # 2. Преобразование в DataFrame
     if not history_queryset:
         return pd.DataFrame(columns=['date', 'usage_qty'])
-
     df = pd.DataFrame(list(history_queryset))
-
-    # Переименовываем столбцы для удобства
     df = df.rename(columns={'operation_date': 'date', 'quantity': 'usage_qty'})
-
-    # *** КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: Конвертируем дату в формат datetime Pandas ***
     df['date'] = pd.to_datetime(df['date'])
-
-    # Теперь, когда даты преобразованы, устанавливаем индекс
     df = df.set_index('date')
-
-    # 3. Агрегация по дням
-    # Группируем расход по дате (если в один день было несколько операций)
-    daily_data = df['usage_qty'].resample('D').sum().fillna(
-        0)  # 'D' - ежедневно, fillna(0) - где нет операций, ставим 0
-
-    # 4. Фильтрация по периоду (180 дней по умолчанию)
+    daily_data = df['usage_qty'].resample('D').sum().fillna(0)
     end_date = pd.to_datetime('today').normalize()
     start_date = end_date - pd.Timedelta(days=days)
-
-    # Создаем полный диапазон дат, чтобы не было пропусков
     full_date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-
-    # Объединяем с полным диапазоном, чтобы заполнить нулями дни без операций
     daily_data = daily_data.reindex(full_date_range, fill_value=0)
-
-    # Возвращаем DataFrame с датами и ежедневным расходом
     return daily_data.reset_index().rename(columns={'index': 'date', 'usage_qty': 'usage_qty'})
 
 
 def predict_usage(df_historical, days_to_predict=30):
-    """
-    Обучает простую модель Linear Regression на исторических данных
-    и прогнозирует расход на N дней вперед.
-
-    :param df_historical: DataFrame с данными 'date' и 'usage_qty'.
-    :param days_to_predict: Количество дней для прогнозирования.
-    :return: Прогнозируемый общий расход за весь период (float).
-    """
     if df_historical.empty or df_historical['usage_qty'].sum() == 0:
         return 0.0
-
-    # 1. Подготовка данных для обучения
-    # X - номер дня (от 0 до N-1)
     df_historical['day_index'] = np.arange(len(df_historical))
-    X = df_historical[['day_index']]
-    # Y - фактический расход
-    Y = df_historical['usage_qty']
-
-    # 2. Обучение модели
+    # Используем values для предотвращения UserWarning о именах признаков
+    X = df_historical[['day_index']].values
+    Y = df_historical['usage_qty'].values
     model = LinearRegression()
     model.fit(X, Y)
-
-    # 3. Подготовка данных для прогноза
-    # Начинаем прогнозировать сразу после последнего дня в обучающей выборке
     last_day_index = len(df_historical) - 1
-
-    # X_future - индексы дней, которые мы хотим предсказать
     X_future = np.arange(last_day_index + 1, last_day_index + 1 + days_to_predict).reshape(-1, 1)
-
-    # 4. Прогнозирование
     predictions = model.predict(X_future)
-
-    # Прогноз не может быть отрицательным
     predictions[predictions < 0] = 0
+    return np.sum(predictions)
 
-    # Суммируем прогнозируемый расход за весь период
-    predicted_total_usage = np.sum(predictions)
-
-    return predicted_total_usage
-
-
-# --- НОВАЯ ГЛАВНАЯ ФУНКЦИЯ ---
 
 def get_recommendation(material_id, days_to_forecast=30):
-    """
-    Основная функция, которая возвращает прогноз и рекомендации.
-    """
-    # 1. Получаем исторические данные
-    df_usage = get_historical_usage_data(material_id, days=180)  # Используем 180 дней истории
-
-    # 2. Прогнозируем расход
+    df_usage = get_historical_usage_data(material_id, days=180)
     predicted_usage = predict_usage(df_usage, days_to_forecast)
 
     try:
@@ -118,44 +82,75 @@ def get_recommendation(material_id, days_to_forecast=30):
     except Material.DoesNotExist:
         return {'error': 'Материал не найден'}
 
-    # 3. Расчет текущего состояния
     current_stock = material.current_quantity
-    min_threshold = material.min_threshold
+    recommended_stock = predicted_usage + material.min_threshold
 
-    # 4. Расчет рекомендуемого запаса
-    # Рекомендуемый запас должен покрывать прогнозируемый расход плюс минимальный порог
-    recommended_stock = predicted_usage + min_threshold
+    # --- ИСПРАВЛЕННЫЙ БЛОК ГРАФИКА ---
+    # Делаем копию и принудительно переводим в datetime, чтобы избежать AttributeError
+    recent_history = df_usage.tail(30).copy()
+    recent_history['date'] = pd.to_datetime(recent_history['date'])
 
-    # 5. Генерация рекомендации
-    recommendation = ""
-    action = "NONE"  # NONE, PURCHASE, DISPOSE
-    quantity_delta = 0
+    chart_labels = recent_history['date'].dt.strftime('%d.%m').tolist()
+    chart_data = recent_history['usage_qty'].tolist()
 
-    # Анализ 1: Закупка
-    if current_stock < recommended_stock:
-        quantity_to_buy = recommended_stock - current_stock
-        recommendation = f"Рекомендуется закупить {round(quantity_to_buy, 2)} {material.unit} для покрытия прогнозируемого спроса и поддержания минимального запаса."
-        action = "PURCHASE"
-        quantity_delta = round(quantity_to_buy, 2)
+    # 2. СЕЗОННОСТЬ И ТРЕНД
+    last_month_usage = df_usage['usage_qty'].tail(30).mean()
+    overall_avg = df_usage['usage_qty'].mean()
+    trend = "растущий" if last_month_usage > overall_avg else "стабильный"
 
-    # Анализ 2: Списание (Если запас сильно превышает рекомендуемый)
-    elif current_stock > recommended_stock * 2:  # Если текущий запас в 2 раза больше, чем нужно
-        # Также проверяем срок годности (если он скоро истекает)
-        if material.expiration_date and (material.expiration_date - timedelta(days=days_to_forecast)).days < 60:
-            recommendation = f"Запас сильно превышает прогнозируемый спрос. Рекомендуется рассмотреть списание части запаса ({material.name}) или использование его в ближайшее время, учитывая срок годности."
-            action = "DISPOSE"
-            # Мы не будем автоматически предлагать количество для списания, так как это сложный вопрос
+    # 3. ОЦЕНКА РИСКА БРАКА
+    risk_level = "Низкий"
+    if material.expiration_date:
+        days_to_expiry = (material.expiration_date - date.today()).days
+        if days_to_expiry < 14:
+            risk_level = "Критический (срок истекает)"
+        elif days_to_expiry < 60:
+            risk_level = "Средний"
 
+    # 4. ВЫЯВЛЕНИЕ АНОМАЛИЙ
+    anomaly_detected = "Нет"
+    if predicted_usage < 1 and current_stock < material.min_threshold:
+        anomaly_detected = "Резкое снижение остатков без зафиксированного расхода"
+
+    quantity_delta = max(0, recommended_stock - current_stock)
+    display_delta = int(np.ceil(quantity_delta))
+    action = "PURCHASE" if current_stock < recommended_stock else "NONE"
+
+    token = get_giga_token()
+    if token:
+        prompt = (
+            f"Ты — эксперт-аналитик склада. Данные по '{material.name}':\n"
+            f"- Тренд: {trend}, Риск брака: {risk_level}, Аномалии: {anomaly_detected}.\n"
+            f"- Запас: {current_stock}, Прогноз: {round(predicted_usage, 2)}.\n"
+            f"Дай краткий совет (до 20 слов): нужно ли закупать {display_delta} ед. и есть ли риски."
+        )
+
+        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'}
+        payload = {"model": "GigaChat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.5}
+
+        try:
+            res = requests.post("https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+                                headers=headers, json=payload, verify=False)
+            raw_text = res.json()['choices'][0]['message']['content']
+            recommendation_text = raw_text.replace('*', '')
+        except Exception:
+            recommendation_text = "Ошибка ИИ-анализа. Рекомендуется ручная проверка."
     else:
-        recommendation = "Текущий запас в пределах нормы. Дополнительных действий не требуется."
+        recommendation_text = "ИИ временно недоступен. Используйте математический прогноз."
 
     return {
         'material_name': material.name,
         'current_stock': current_stock,
         'predicted_usage': round(predicted_usage, 2),
         'recommended_stock': round(recommended_stock, 2),
-        'recommendation': recommendation,
+        'recommendation_text': recommendation_text,
         'action': action,
-        'quantity_delta': quantity_delta,
         'days_to_forecast': days_to_forecast,
+        'quantity_delta': round(quantity_delta, 2),
+        'stock_status_percent': min(100,
+                                    int((current_stock / recommended_stock) * 100)) if recommended_stock > 0 else 100,
+        'risk_level': risk_level,
+        'trend': trend,
+        'chart_labels': chart_labels,
+        'chart_data': chart_data,
     }

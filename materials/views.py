@@ -10,6 +10,8 @@ from django.utils import timezone
 from forecasting.model_utils import get_recommendation
 
 
+# --- Основные операции ---
+
 @login_required
 def material_create(request):
     if request.method == 'POST':
@@ -88,7 +90,7 @@ def material_history(request, pk):
     return render(request, 'materials/material_history.html', {'material': material, 'history': history})
 
 
-# --- Список и Анализ (Здесь было ИСПРАВЛЕНИЕ и ДОБАВЛЕНИЕ) ---
+# --- Список и Анализ ---
 
 @login_required
 def material_list(request):
@@ -101,6 +103,7 @@ def material_list(request):
     search_query = request.GET.get('search', '')
     category_id = request.GET.get('category')
     expiry_filter = request.GET.get('expiry')
+    qty_filter = request.GET.get('qty_status')
     today = date.today()
 
     if search_query:
@@ -109,6 +112,11 @@ def material_list(request):
         )
     if category_id:
         queryset = queryset.filter(category_id=category_id)
+
+    if qty_filter == 'low':
+        queryset = queryset.filter(current_quantity__lt=F('min_threshold'), current_quantity__gt=0)
+    elif qty_filter == 'out':
+        queryset = queryset.filter(current_quantity=0)
 
     if expiry_filter == 'expired':
         queryset = queryset.filter(expiration_date__lt=today)
@@ -120,7 +128,6 @@ def material_list(request):
 
     materials = queryset.order_by('name')
 
-    # 5. Добавляем цветовую маркировку и считаем статистику (ИСПРАВЛЕНИЕ)
     total_count = materials.count()
     critical_count = 0
     below_threshold_count = 0
@@ -128,37 +135,32 @@ def material_list(request):
 
     for material in materials:
         is_critical = False
-        is_warning = False  # <-- НОВАЯ ПЕРЕМЕННАЯ ДЛЯ ЖЕЛТОЙ ЗОНЫ
+        is_warning = False
 
-        # Проверяем количество (Критический остаток: 0)
         if material.current_quantity == 0:
             is_critical = True
 
-        # Проверяем срок годности
         if material.expiration_date:
             days_left = (material.expiration_date - today).days
-
             if days_left < 0:
-                is_critical = True  # Красный: Просрочен
+                is_critical = True
                 material.expiry_status = 'expired'
             elif days_left <= 30:
                 soon_expiry_count += 1
-                is_warning = True  # <-- Желтый: Скоро истекает
+                is_warning = True
                 material.expiry_status = 'soon'
             else:
                 material.expiry_status = 'ok'
 
-        # Проверяем порог (Если не критический (т.е. остаток > 0))
         if material.current_quantity < material.min_threshold and material.current_quantity > 0:
             below_threshold_count += 1
-            is_warning = True  # <-- Желтый: Мало (Если еще не критично)
+            is_warning = True
 
-        # Устанавливаем цвет строки: ПРИОРИТЕТ is_critical > is_warning
         if is_critical:
-            material.row_class = 'table-danger'  # КРАСНЫЙ
+            material.row_class = 'table-danger'
             critical_count += 1
         elif is_warning:
-            material.row_class = 'table-warning'  # ЖЕЛТЫЙ
+            material.row_class = 'table-warning'
         else:
             material.row_class = 'table-light'
 
@@ -168,147 +170,96 @@ def material_list(request):
         'search_query': search_query,
         'selected_category': category_id,
         'selected_expiry': expiry_filter,
+        'selected_qty': qty_filter,
         'total_count': total_count,
         'critical_count': critical_count,
         'below_threshold_count': below_threshold_count,
         'soon_expiry_count': soon_expiry_count,
     }
-
     return render(request, 'materials/material_list.html', context)
 
 
-# --- НОВАЯ ФУНКЦИЯ: Отчет по оборачиваемости ---
-
-# materials/views.py (Обновленная функция analytics_report)
-
 @login_required
 def analytics_report(request):
-    """
-    Расчет и отображение отчета по оборачиваемости, используя
-    СКОРРЕКТИРОВАННЫЙ СРЕДНИЙ ЗАПАС за период, а не только текущий остаток.
-    """
+    """Отчет по оборачиваемости"""
     user = request.user
-
-    # 1. Определение периода
     days = int(request.GET.get('days', 90))
     end_date = date.today()
     start_date = end_date - timedelta(days=days)
 
-    # 2. Получение ВСЕХ операций (Приход и Расход/Списание) за период
     history_data = UsageHistory.objects.filter(
         material__user=user,
         operation_date__range=[start_date, end_date],
-    ).values(
-        'material__name',
-        'material',
-        'operation_type'
-    ).annotate(
-        total_quantity=Sum('quantity')
-    )
+    ).values('material__name', 'material', 'operation_type').annotate(total_quantity=Sum('quantity'))
 
-    # Преобразуем данные истории в удобный словарь для каждого материала
     material_stats = {}
     for item in history_data:
         material_id = item['material']
         if material_id not in material_stats:
             material_stats[material_id] = {'usage': 0, 'income': 0}
-
-        op_type = item['operation_type']
-
-        if op_type == UsageHistory.OperationType.IN:
+        if item['operation_type'] == UsageHistory.OperationType.IN:
             material_stats[material_id]['income'] += item['total_quantity']
-        else:  # OUT или DISP (Расход)
+        else:
             material_stats[material_id]['usage'] += item['total_quantity']
 
-    # 3. Расчет Среднего Запаса и Оборачиваемости
     report_data = []
-
-    # Получаем все материалы, у которых была активность за период
-    active_material_ids = material_stats.keys()
-    materials = Material.objects.filter(pk__in=active_material_ids)
+    materials = Material.objects.filter(pk__in=material_stats.keys())
 
     for material in materials:
         stats = material_stats.get(material.pk, {'usage': 0, 'income': 0})
-        total_usage = stats['usage']
-        total_income = stats['income']
-        current_stock = material.current_quantity
-
-        # --- Ключевой расчет Среднего Запаса ---
-
-        # Запас на конец периода (End Stock) = Текущий остаток (current_stock)
-        end_stock = current_stock
-
-        # Запас на начало периода (Start Stock) = End Stock + Расход - Приход
-        start_stock = end_stock + total_usage - total_income
-
-        # Средний запас (Average Stock) = (Start Stock + End Stock) / 2
-        # Убедимся, что начальный запас не отрицательный (хотя это маловероятно, если учет верен)
-        if start_stock < 0:
-            start_stock = 0
-
+        end_stock = material.current_quantity
+        start_stock = max(0, end_stock + stats['usage'] - stats['income'])
         average_stock = (start_stock + end_stock) / 2
-
-        # --- Расчет Оборачиваемости ---
-        turnover = None
-
-        # Избегаем деления на ноль и бессмысленных расчетов
-        if average_stock > 0 and total_usage > 0:
-            turnover = total_usage / average_stock
+        turnover = stats['usage'] / average_stock if average_stock > 0 and stats['usage'] > 0 else None
 
         report_data.append({
             'name': material.name,
-            'total_usage': total_usage,
-            'current_stock': current_stock,
-            'average_stock': round(average_stock, 2),  # Добавлено для отображения
-            'start_stock': round(start_stock, 2),  # Добавлено для отображения
+            'total_usage': stats['usage'],
+            'current_stock': end_stock,
+            'average_stock': round(average_stock, 2),
+            'start_stock': round(start_stock, 2),
             'turnover_rate': turnover,
             'material_id': material.pk,
         })
 
-    # Сортировка по ставке оборачиваемости (от высокой к низкой)
     report_data.sort(key=lambda x: x['turnover_rate'] if x['turnover_rate'] is not None else -1, reverse=True)
+    return render(request, 'materials/analytics_report.html', {
+        'report_data': report_data, 'days': days, 'start_date': start_date, 'end_date': end_date
+    })
 
-    context = {
-        'report_data': report_data,
-        'days': days,
-        'start_date': start_date,
-        'end_date': end_date,
-        'report_title': f"Отчет по оборачиваемости (за {days} дней)",
-    }
 
-    return render(request, 'materials/analytics_report.html', context)
-
+# --- ИНТЕГРИРОВАННАЯ ФУНКЦИЯ ПРОГНОЗА ---
 
 @login_required
 def material_forecast(request, pk):
     """
-    Представление для отображения прогноза спроса и рекомендаций
-    для конкретного материала.
+    Представление для отображения прогноза спроса с использованием ИИ GigaChat.
     """
     material = get_object_or_404(Material, pk=pk, user=request.user)
 
-    # 1. Вызов основной функции ИИ-модуля
     forecast_days = int(request.GET.get('days', 30))
+
     recommendation_data = get_recommendation(
         material_id=pk,
         days_to_forecast=forecast_days
     )
 
-    # *** НОВАЯ ЛОГИКА: Расчет классов и иконок в Python (КОРРЕКЦИЯ ОШИБКИ) ***
     action = recommendation_data['action']
-    if action == 'PURCHASE':
-        recommendation_data['alert_class'] = 'alert-danger'
-        recommendation_data['icon_class'] = 'fas fa-shopping-cart'
-    elif action == 'DISPOSE':
-        recommendation_data['alert_class'] = 'alert-warning'
-        recommendation_data['icon_class'] = 'fas fa-trash-alt'
-    else:
-        recommendation_data['alert_class'] = 'alert-success'
-        recommendation_data['icon_class'] = 'fas fa-check-circle'
-    # *** КОНЕЦ НОВОЙ ЛОГИКИ ***
 
-    # Добавляем объект материала в контекст
+    # МЕНЯЕМ ЦВЕТА ЗДЕСЬ
+    if action == 'PURCHASE':
+        recommendation_data['alert_class'] = 'alert-success'  # Зеленый, как просили
+        recommendation_data['icon_class'] = 'fas fa-shopping-cart'
+        recommendation_data['status_color'] = 'bg-danger'  # Цвет полоски прогресса
+    elif action == 'DISPOSE':
+        recommendation_data['alert_class'] = 'alert-warning'  # Желтый
+        recommendation_data['icon_class'] = 'fas fa-trash-alt'
+        recommendation_data['status_color'] = 'bg-warning'
+    else:
+        recommendation_data['alert_class'] = 'alert-info'  # Синий/Голубой
+        recommendation_data['icon_class'] = 'fas fa-check-circle'
+        recommendation_data['status_color'] = 'bg-success'
+
     recommendation_data['material'] = material
 
-    # 2. Формирование контекста и вывод
     return render(request, 'materials/material_forecast.html', recommendation_data)
